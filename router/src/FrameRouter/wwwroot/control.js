@@ -59,12 +59,28 @@
       showLogin('Zły token.');
       return null;
     }
-    if (!response.ok) throw new Error((await response.text()) || 'HTTP ' + response.status);
+    if (!response.ok) throw new Error(await errorText(response));
     return response.json();
   }
 
+  // The API answers errors as a JSON string or as problem+json.
+  async function errorText(response) {
+    const text = await response.text();
+    try {
+      const body = JSON.parse(text);
+      return typeof body === 'string' ? body : body.detail || body.title || text;
+    } catch (error) {
+      return text || 'HTTP ' + response.status;
+    }
+  }
+
+  // The server notices an ended override on its next 15 s tick; do not show a past end time meanwhile.
+  function isOverridden(snapshot) {
+    return Boolean(snapshot.overrideUntil) && new Date(snapshot.overrideUntil) > new Date();
+  }
+
   function describe(snapshot) {
-    if (snapshot.overrideUntil) {
+    if (isOverridden(snapshot)) {
       return el('div', 'state override', 'Teraz: ' + snapshot.name + ' do ' + timeFormat.format(new Date(snapshot.overrideUntil)));
     }
     const dim = snapshot.dim > 0 ? ' · przyciemniona' : '';
@@ -93,7 +109,7 @@
       });
       card.appendChild(buttons);
 
-      if (frame.snapshot.overrideUntil) {
+      if (isOverridden(frame.snapshot)) {
         const back = el('button', 'back', 'Wróć do harmonogramu');
         back.type = 'button';
         back.addEventListener('click', function () { act('DELETE', frame.id); });
@@ -108,7 +124,8 @@
     if (!sessionToken || busy || document.hidden) return;
     try {
       const state = await call('GET', '/frames');
-      if (!state) return;
+      // An action started while this request was in flight; its own refresh draws the result.
+      if (!state || busy) return;
       login.hidden = true;
       panel.hidden = false;
       setMessage('Zmiana dociera do ramki w kilka sekund.');

@@ -70,7 +70,8 @@ Zasady nadpisania:
 
 - Nadpisanie kończy się samo po wybranym czasie (1 min do 24 h). Ramka wraca do `schedule` i `default` z `screens.json`.
   Koniec dociera do ramki z opóźnieniem do 15 s.
-- Push `screens.json` nie kasuje nadpisania. Nadpisanie znika wcześniej tylko wtedy, gdy push usunie jego ekran.
+- Push `screens.json` nie kasuje nadpisania. Gdy push usunie ekran nadpisania, ramka wraca do harmonogramu.
+- Bez `minutes` w API nadpisanie trwa 30 min.
 - Przyciemnianie (`dim`) działa dalej według `screens.json`.
 - Nadpisania leżą w `/app/data/overrides.json` i przeżywają restart kontenera. Nic nie trafia do repo.
 

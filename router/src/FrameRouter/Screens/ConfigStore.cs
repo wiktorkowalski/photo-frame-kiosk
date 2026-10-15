@@ -48,7 +48,7 @@ internal sealed class ConfigStore(IOptions<FrameRouterOptions> options, ILogger<
         await _writeGate.WaitAsync(cancellationToken);
         try
         {
-            AtomicFile.WriteAllText(_savedPath, json);
+            await AtomicFile.WriteAllTextAsync(_savedPath, json, cancellationToken);
             Volatile.Write(ref _current, result.Config);
         }
         finally

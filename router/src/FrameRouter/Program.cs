@@ -2,6 +2,7 @@ using FrameRouter.Extensions;
 using FrameRouter.Screens;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = WebApplicationExtensions.MaxRequestBytes);
 builder.Services.AddFrameRouter();
 
 var app = builder.Build();

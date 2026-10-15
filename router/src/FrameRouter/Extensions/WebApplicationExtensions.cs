@@ -1,20 +1,21 @@
 using System.Globalization;
-using System.Security.Cryptography;
 using System.Text;
 using FrameRouter.Mzk;
 using FrameRouter.Screens;
-using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Options;
 
 namespace FrameRouter.Extensions;
 
 internal static class WebApplicationExtensions
 {
+    // Kestrel answers 413 above this, chunked or not, so no endpoint reads a large unauthenticated body. The config is the largest one.
+    public const int MaxRequestBytes = 64 * 1024;
+
     private const int DefaultDepartureLimit = 8;
-    private const int MaxConfigBytes = 64 * 1024;
     private const int MinStopQueryLength = 2;
     private const int MaxStopQueryLength = 40;
     private const int MaxOverrideMinutes = 24 * 60;
+    private const int DefaultOverrideMinutes = 30;
 
     public static WebApplication MapFrameRouterEndpoints(this WebApplication app)
     {
@@ -35,15 +36,13 @@ internal static class WebApplicationExtensions
         app.MapGet("/api/stops", FindStopsAsync);
         app.MapGet("/api/config", (ConfigStore configStore) => Results.Ok(configStore.Current));
 
-        // Same token check on frame.vicio.ovh and frame.home.vicio.ovh: neither host puts its own auth in front of the router.
         var options = app.Services.GetRequiredService<IOptions<FrameRouterOptions>>().Value;
         app.MapPost("/api/config", ApplyConfigAsync).RequireBearer(options.ConfigToken, "FrameRouter__ConfigToken");
 
-        // The control page and Home Assistant set temporary screens here.
         var control = app.MapGroup("/api/control").RequireBearer(options.ControlToken, "FrameRouter__ControlToken");
         control.MapGet("/frames", GetControlState);
-        control.MapPut("/frames/{frameId}/override", SetOverride);
-        control.MapDelete("/frames/{frameId}/override", ClearOverride);
+        control.MapPut("/frames/{frameId}/override", SetOverrideAsync);
+        control.MapDelete("/frames/{frameId}/override", ClearOverrideAsync);
 
         return app;
     }
@@ -77,12 +76,12 @@ internal static class WebApplicationExtensions
         var config = configStore.Current;
         return new ControlState
         {
-            Screens = config.Screens.Keys.ToList(),
-            Frames = config.Frames.Select(frame => new ControlFrame { Id = frame.Key, Label = frame.Value.Label, Snapshot = screenState.GetSnapshot(frame.Key) }).ToList(),
+            Screens = [.. config.Screens.Keys],
+            Frames = [.. config.Frames.Select(frame => new ControlFrame { Id = frame.Key, Label = frame.Value.Label, Snapshot = screenState.GetSnapshot(frame.Key) })],
         };
     }
 
-    private static IResult SetOverride(string frameId, OverrideRequest body, ConfigStore configStore, ScreenState screenState)
+    private static async Task<IResult> SetOverrideAsync(string frameId, OverrideRequest body, ConfigStore configStore, ScreenState screenState, CancellationToken cancellationToken)
     {
         var config = configStore.Current;
         if (!config.Frames.ContainsKey(frameId))
@@ -91,19 +90,20 @@ internal static class WebApplicationExtensions
         if (body.Screen is null || !config.Screens.ContainsKey(body.Screen))
             return Results.BadRequest($"Pass \"screen\" with one of: {string.Join(", ", config.Screens.Keys)}.");
 
-        if (body.Minutes is not (>= 1 and <= MaxOverrideMinutes))
-            return Results.BadRequest($"Pass \"minutes\" from 1 to {MaxOverrideMinutes}.");
+        var minutes = body.Minutes ?? DefaultOverrideMinutes;
+        if (minutes is < 1 or > MaxOverrideMinutes)
+            return Results.BadRequest($"Pass \"minutes\" from 1 to {MaxOverrideMinutes}, or leave it out for {DefaultOverrideMinutes}.");
 
-        screenState.SetOverride(frameId, body.Screen, TimeSpan.FromMinutes(body.Minutes.Value));
+        await screenState.SetOverrideAsync(frameId, body.Screen, TimeSpan.FromMinutes(minutes), cancellationToken);
         return Results.Ok(screenState.GetSnapshot(frameId));
     }
 
-    private static IResult ClearOverride(string frameId, ConfigStore configStore, ScreenState screenState)
+    private static async Task<IResult> ClearOverrideAsync(string frameId, ConfigStore configStore, ScreenState screenState, CancellationToken cancellationToken)
     {
         if (!configStore.Current.Frames.ContainsKey(frameId))
             return FrameNotFound(frameId);
 
-        screenState.ClearOverride(frameId);
+        await screenState.ClearOverrideAsync(frameId, cancellationToken);
         return Results.Ok(screenState.GetSnapshot(frameId));
     }
 
@@ -135,9 +135,6 @@ internal static class WebApplicationExtensions
 
     private static async Task<IResult> ApplyConfigAsync(HttpRequest request, ConfigStore configStore, ScreenState screenState, CancellationToken cancellationToken)
     {
-        // Kestrel answers 413 itself when the body passes the limit, chunked or not.
-        request.HttpContext.Features.GetRequiredFeature<IHttpMaxRequestBodySizeFeature>().MaxRequestBodySize = MaxConfigBytes;
-
         using var reader = new StreamReader(request.Body, Encoding.UTF8);
         var errors = await configStore.ApplyAsync(await reader.ReadToEndAsync(cancellationToken), cancellationToken);
         if (errors.Count > 0)
@@ -145,23 +142,6 @@ internal static class WebApplicationExtensions
 
         screenState.Refresh();
         return Results.Ok(configStore.Current.Frames.Keys.Select(screenState.GetSnapshot));
-    }
-
-    private static TBuilder RequireBearer<TBuilder>(this TBuilder builder, string token, string settingName)
-        where TBuilder : IEndpointConventionBuilder
-    {
-        var expected = Encoding.UTF8.GetBytes(token);
-        return builder.AddEndpointFilter((context, next) =>
-        {
-            if (expected.Length == 0)
-                return ValueTask.FromResult<object?>(Results.Problem($"This endpoint is off: {settingName} is not set.", statusCode: StatusCodes.Status403Forbidden));
-
-            const string scheme = "Bearer ";
-            var header = context.HttpContext.Request.Headers.Authorization.ToString();
-            var authorized = header.StartsWith(scheme, StringComparison.Ordinal)
-                && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(header[scheme.Length..]), expected);
-            return authorized ? next(context) : ValueTask.FromResult<object?>(Results.Unauthorized());
-        });
     }
 
     private static List<int>? ParseStopIds(string? stops)

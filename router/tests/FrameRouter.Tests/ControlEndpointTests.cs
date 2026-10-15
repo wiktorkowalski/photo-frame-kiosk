@@ -84,6 +84,19 @@ public sealed class ControlEndpointTests : IDisposable
         Assert.Null(await GetOverrideUntilAsync(client));
     }
 
+    [Fact]
+    public async Task SetOverride_NoMinutes_Lasts30MinutesAsync()
+    {
+        using var client = CreateAuthorizedClient();
+
+        var response = await client.PutAsJsonAsync("/api/control/frames/dxmart/override", new { screen = "clock" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var until = await GetOverrideUntilAsync(client);
+        Assert.NotNull(until);
+        Assert.InRange(until.Value - DateTimeOffset.UtcNow, TimeSpan.FromMinutes(29), TimeSpan.FromMinutes(30));
+    }
+
     [Theory]
     [InlineData("dxmart", "nope", 30, HttpStatusCode.BadRequest)]
     [InlineData("dxmart", "clock", 0, HttpStatusCode.BadRequest)]

@@ -33,15 +33,15 @@ internal sealed class ScreenState(ConfigStore configStore, OverrideStore overrid
             RefreshLocked();
     }
 
-    public void SetOverride(string frameId, string screen, TimeSpan duration)
+    public async Task SetOverrideAsync(string frameId, string screen, TimeSpan duration, CancellationToken cancellationToken)
     {
-        overrideStore.Set(frameId, screen, duration);
+        await overrideStore.SetAsync(frameId, screen, duration, cancellationToken);
         Refresh();
     }
 
-    public void ClearOverride(string frameId)
+    public async Task ClearOverrideAsync(string frameId, CancellationToken cancellationToken)
     {
-        overrideStore.Clear(frameId);
+        await overrideStore.ClearAsync(frameId, cancellationToken);
         Refresh();
     }
 
