@@ -1,0 +1,26 @@
+{
+  // What every frame shows. A push to master that changes this file reaches the frames in
+  // about 30 seconds. A file the router rejects turns the "Push screens" workflow red, and the
+  // frames keep the last good config.
+  "screens": {
+    "clock": { "type": "clock" },
+    "departures": {
+      "type": "departures",
+      "title": "Dworzec Główny",
+      // MZK busStopId values. Find a stop at https://frame.home.vicio.ovh/stops.html
+      "stops": [11],
+      "limit": 8
+    }
+  },
+  // One entry per frame. The frame loads https://frame.home.vicio.ovh/?frame=<id>.
+  // Each frame shows the first schedule rule that matches the time in Europe/Warsaw,
+  // and its "default" screen when no rule matches.
+  "frames": {
+    "dxmart": {
+      "default": "clock",
+      "schedule": [
+        { "screen": "departures", "days": ["mon", "tue", "wed", "thu", "fri"], "from": "06:30", "to": "09:00" }
+      ]
+    }
+  }
+}

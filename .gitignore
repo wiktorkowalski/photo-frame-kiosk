@@ -1,0 +1,16 @@
+bin/
+obj/
+.DS_Store
+.idea/
+.vs/
+*.user
+# Local run of the router writes pushed configs here.
+router/src/FrameRouter/data/
+
+# Device dumps, keys and per-frame records stay on the Mac, never in this public repo.
+/backups/
+/frames/
+/diagnostics/
+*.img
+*.bin
+*.keystore

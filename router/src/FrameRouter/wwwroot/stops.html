@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Przystanki MZK</title>
+  <style>
+    body { margin: 0; padding: 16px; font-family: system-ui, Roboto, Arial, sans-serif; background: #f6f7f9; color: #15181d; }
+    main { max-width: 860px; margin: 0 auto; }
+    h1 { font-size: 24px; }
+    form { display: flex; gap: 8px; margin-bottom: 16px; }
+    input { flex: 1; min-width: 0; padding: 10px; font-size: 16px; border: 1px solid #c4cad3; border-radius: 6px; }
+    button { padding: 10px 16px; font-size: 16px; border: 0; border-radius: 6px; background: #15181d; color: #fff; }
+    .stop { padding: 12px; margin-bottom: 8px; background: #fff; border: 1px solid #e1e5ea; border-radius: 8px; }
+    .stop-id { font-family: ui-monospace, Menlo, monospace; font-weight: 700; }
+    .muted { color: #5d6672; font-size: 14px; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #0f1115; color: #e8ebef; }
+      .stop { background: #171a20; border-color: #262b33; }
+      input { background: #171a20; color: #e8ebef; border-color: #333a44; }
+      button { background: #e8ebef; color: #0f1115; }
+      .muted { color: #9aa3ae; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Przystanki MZK Zielona Góra</h1>
+    <p class="muted">Wpisz nazwę przystanku. Każdy słupek ma własne id i kierunki. Wpisz id do pola <code>stops</code> w <code>screens.json</code>.</p>
+    <form id="search">
+      <input id="query" type="search" placeholder="np. dworzec" autocomplete="off" autofocus>
+      <button type="submit">Szukaj</button>
+    </form>
+    <div id="results"></div>
+  </main>
+  <script src="stops.js"></script>
+</body>
+</html>
