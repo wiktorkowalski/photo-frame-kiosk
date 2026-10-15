@@ -104,9 +104,33 @@ rest_command:
       Authorization: !secret frame_control_auth
     content_type: "application/json"
     payload: '{"screen": "{{ screen }}", "minutes": {{ minutes | default(30) }}}'
+  frame_clear:
+    url: "https://frame.vicio.ovh/api/control/frames/{{ frame }}/override"
+    method: delete
+    headers:
+      Authorization: !secret frame_control_auth
 ```
 
-Wywołanie: akcja `rest_command.frame_show` z danymi `frame: dxmart`, `screen: departures`, `minutes: 20`.
+Wywołanie: akcja `rest_command.frame_show` z danymi `frame: dxmart`, `screen: clock`, `minutes: 20`.
+Ramka wraca do harmonogramu po akcji `rest_command.frame_clear` z danymi `frame: dxmart`.
+Pierwszy blok `rest_command` w HA wymaga pełnego restartu. Kolejne komendy wystarczy przeładować w YAML.
+
+Przycisk na dashboardzie (karta `button`):
+
+```yaml
+type: button
+name: Zegar
+icon: mdi:clock-outline
+tap_action:
+  action: perform-action
+  perform_action: rest_command.frame_show
+  data:
+    frame: dxmart
+    screen: clock
+    minutes: 30
+```
+
+Na domowym HA te przyciski są na dashboardzie „Ramka” (`/dashboard-ramka`): zegar, ekran HA i powrót do harmonogramu.
 
 ## Układ repo
 
