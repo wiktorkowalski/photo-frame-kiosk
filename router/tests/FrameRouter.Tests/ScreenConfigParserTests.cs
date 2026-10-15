@@ -61,6 +61,11 @@ public sealed class ScreenConfigParserTests
     [InlineData("""{ "default": "clock", "schedule": [{ "screen": "clock", "from": "6:30", "to": "09:00" }] }""", "times like")]
     [InlineData("""{ "default": "clock", "schedule": [{ "screen": "clock", "from": "09:00", "to": "09:00" }] }""", "the same time")]
     [InlineData("""{ "default": "clock", "schedule": [{ "screen": "clock", "from": "06:00", "to": "09:00", "days": ["monday"] }] }""", "unknown day")]
+    [InlineData("""{ "default": "clock", "dim": [{ "from": "23:00", "to": "06:30", "level": 0 }] }""", "\"level\" must be above 0")]
+    [InlineData("""{ "default": "clock", "dim": [{ "from": "23:00", "to": "06:30", "level": 1.5 }] }""", "\"level\" must be above 0")]
+    [InlineData("""{ "default": "clock", "dim": [{ "from": "23:00", "to": "6:30", "level": 0.8 }] }""", "dim rule 1: \"from\" and \"to\" must be times")]
+    [InlineData("""{ "default": "clock", "dim": [{ "from": "23:00", "to": "06:30", "level": 0.8, "days": ["xyz"] }] }""", "unknown day")]
+    [InlineData("""{ "default": "clock", "dim": [{ "from": "23:00", "to": "06:30" }] }""", "level")]
     public void Parse_InvalidFramePlan_ReportsError(string plan, string expected)
     {
         var json = $$"""{ "screens": { "clock": { "type": "clock" } }, "frames": { "kitchen": {{plan}} } }""";
@@ -77,6 +82,8 @@ public sealed class ScreenConfigParserTests
     [InlineData("""{ "screens": { "clock": null }, "frames": { "kitchen": { "default": "clock" } } }""")]
     [InlineData("""{ "screens": { "clock": { "type": "clock" } }, "frames": { "kitchen": null } }""")]
     [InlineData("""{ "screens": { "clock": { "type": "clock" } }, "frames": { "kitchen": { "default": "clock", "schedule": [null] } } }""")]
+    [InlineData("""{ "screens": { "clock": { "type": "clock" } }, "frames": { "kitchen": { "default": "clock", "dim": null } } }""")]
+    [InlineData("""{ "screens": { "clock": { "type": "clock" } }, "frames": { "kitchen": { "default": "clock", "dim": [null] } } }""")]
     [InlineData("""{ "screens": { "clock": { "type": "clock" } }, "frames": { "kitchen": { "default": "clock", "schedule": [{ "screen": "clock", "from": "06:00", "to": "07:00", "days": [null] }] } } }""")]
     public void Parse_NullValue_ReportsErrorWithoutThrowing(string json)
     {

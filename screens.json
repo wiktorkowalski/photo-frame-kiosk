@@ -7,12 +7,15 @@
     "departures": {
       "type": "departures",
       "title": "Dworzec Główny",
-      // MZK busStopId values. Find a stop at https://frame.home.vicio.ovh/stops.html
+      // MZK busStopId values. Find a stop at https://frame.vicio.ovh/stops.html
       "stops": [11],
       "limit": 8
-    }
+    },
+    // Home Assistant kiosk dashboard. Log in once by touch on the frame (README, "Home Assistant").
+    "ha": { "type": "url", "url": "https://ha.home.vicio.ovh/dashboard-kiosk" }
   },
-  // One entry per frame. The frame loads https://frame.home.vicio.ovh/?frame=<id>.
+  // One entry per frame. The frame loads https://frame.vicio.ovh/?frame=<id>
+  // (or https://frame.home.vicio.ovh/?frame=<id> on the home network).
   // Each frame shows the first schedule rule that matches the time in Europe/Warsaw,
   // and its "default" screen when no rule matches.
   "frames": {
@@ -20,6 +23,11 @@
       "default": "clock",
       "schedule": [
         { "screen": "departures", "days": ["mon", "tue", "wed", "thu", "fri"], "from": "06:30", "to": "09:00" }
+      ],
+      // Black overlay at night. "level" 0.85 leaves 15 % of the brightness, 1 is fully black.
+      // The frame dims instead of sleeping: its Wi-Fi does not come back after a screen sleep.
+      "dim": [
+        { "from": "23:00", "to": "06:30", "level": 0.85 }
       ]
     }
   }

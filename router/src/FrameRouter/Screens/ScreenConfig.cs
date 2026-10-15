@@ -12,6 +12,8 @@ internal sealed record FramePlan
     public required string Default { get; init; }
 
     public IReadOnlyList<ScheduleRule> Schedule { get; init; } = [];
+
+    public IReadOnlyList<DimRule> Dim { get; init; } = [];
 }
 
 internal sealed record ScreenDefinition
@@ -27,15 +29,25 @@ internal sealed record ScreenDefinition
     public string? Url { get; init; }
 }
 
-internal sealed record ScheduleRule
+// A daily time window in Europe/Warsaw. "days" names the day the window starts on.
+internal abstract record TimeWindow
 {
-    public required string Screen { get; init; }
-
     public required string From { get; init; }
 
     public required string To { get; init; }
 
     public IReadOnlyList<string>? Days { get; init; }
+}
+
+internal sealed record ScheduleRule : TimeWindow
+{
+    public required string Screen { get; init; }
+}
+
+// Level is the opacity of the black overlay: 0.85 leaves 15 % of the brightness.
+internal sealed record DimRule : TimeWindow
+{
+    public required double Level { get; init; }
 }
 
 internal static class ScreenTypes

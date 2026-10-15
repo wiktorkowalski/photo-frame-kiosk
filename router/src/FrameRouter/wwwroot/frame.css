@@ -27,6 +27,20 @@ html, body {
 
 #screen { position: fixed; top: 0; right: 0; bottom: 0; left: 0; }
 
+/* Night dimming. The Android screen must stay on: the frame's Wi-Fi does not come back after a
+   screen sleep. Touches pass through, so a page in the iframe stays usable. */
+.dim {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 3s;
+}
+
 .status {
   position: fixed;
   right: 16px;

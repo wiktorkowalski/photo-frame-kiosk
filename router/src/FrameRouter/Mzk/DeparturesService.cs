@@ -1,13 +1,17 @@
 using System.Text.Json;
 using System.Xml;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace FrameRouter.Mzk;
 
-internal sealed class DeparturesService(MzkClient mzkClient, TimeProvider timeProvider, ILogger<DeparturesService> logger)
+internal sealed class DeparturesService(MzkClient mzkClient, IMemoryCache cache, TimeProvider timeProvider, ILogger<DeparturesService> logger)
 {
     public const int MaxStopsPerRequest = 6;
     private const int MaxStopOptions = 12;
     private const int StopLookupParallelism = 4;
+
+    // The router is public: during an MZK outage, frames refreshing every 20 s must not each wait 10 s on MZK.
+    private static readonly TimeSpan FailureBackoff = TimeSpan.FromSeconds(30);
 
     public async Task<DepartureBoard> GetBoardAsync(IReadOnlyList<int> stopIds, int limit, CancellationToken cancellationToken)
     {
@@ -63,13 +67,17 @@ internal sealed class DeparturesService(MzkClient mzkClient, TimeProvider timePr
 
     private async Task<StopBoard?> TryGetTimetableAsync(int stopId, CancellationToken cancellationToken)
     {
+        if (cache.TryGetValue(("mzk-timetable-failed", stopId), out _))
+            return null;
+
         try
         {
             return await mzkClient.GetTimetableAsync(stopId, cancellationToken);
         }
         catch (Exception ex) when (IsMzkFailure(ex, cancellationToken))
         {
-            logger.LogWarning(ex, "MZK timetable for stop {StopId} failed", stopId);
+            logger.LogWarning(ex, "MZK timetable for stop {StopId} failed; skipping it for {BackoffSeconds} s", stopId, FailureBackoff.TotalSeconds);
+            cache.Set(("mzk-timetable-failed", stopId), true, FailureBackoff);
             return null;
         }
     }

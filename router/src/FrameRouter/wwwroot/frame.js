@@ -15,6 +15,7 @@
 
   const root = document.getElementById('screen');
   const statusBox = document.getElementById('status');
+  const dimLayer = document.getElementById('dim');
   const frameId = new URLSearchParams(location.search).get('frame') || '';
 
   let loadedVersion = null;
@@ -40,10 +41,17 @@
 
   function show(key, render) {
     if (key === currentKey) return;
-    currentKey = key;
     disposeScreen();
+    disposeScreen = function () {};
     root.textContent = '';
-    disposeScreen = render(root) || function () {};
+    try {
+      disposeScreen = render(root) || function () {};
+    } catch (error) {
+      // Without this a renderer error leaves the screen blank: the next snapshot has the same key and is skipped.
+      root.textContent = '';
+      root.appendChild(el('div', 'message', 'Błąd ekranu: ' + error.message));
+    }
+    currentKey = key;
   }
 
   // A hung request must not stall the next refresh.
@@ -75,6 +83,9 @@
       location.reload();
       return;
     }
+
+    // Dim lives outside the screen key: a change must not reload the iframe.
+    dimLayer.style.opacity = String(snapshot.dim || 0);
 
     if (!snapshot.screen) {
       showMessage('Ramka „' + frameId + '” nie ma wpisu w screens.json.');

@@ -4,7 +4,8 @@
 # The frame id must have an entry under "frames" in screens.json.
 set -euo pipefail
 
-router_url="${ROUTER_URL:-https://frame.home.vicio.ovh}"
+# frame.vicio.ovh works from any network; frame.home.vicio.ovh only on the home LAN.
+router_url="${ROUTER_URL:-https://frame.vicio.ovh}"
 frame_id="${1:-}"
 
 if [[ ! "$frame_id" =~ ^[a-z0-9-]{1,40}$ ]]; then

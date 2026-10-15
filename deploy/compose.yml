@@ -1,5 +1,6 @@
 # Copy of /home/ubuntu/docker/frame-router/compose.yml on the homelab host.
-# .env next to it holds FrameRouter__ConfigToken (same value as the FRAME_ROUTER_CONFIG_TOKEN repo secret).
+# .env next to it holds FrameRouter__ConfigToken (same value as the FRAME_ROUTER_CONFIG_TOKEN repo secret)
+# and TUNNEL_TOKEN (terraform output -raw frame_tunnel_token in cloudflare-terraform).
 services:
   frame-router:
     image: ghcr.io/wiktorkowalski/frame-router:latest
@@ -20,6 +21,20 @@ services:
       - "traefik.http.routers.frame-router.entrypoints=websecure"
       - "traefik.http.routers.frame-router.tls.certresolver=letsencrypt"
       - "traefik.http.services.frame-router.loadbalancer.server.port=8080"
+
+  # Public entry: Cloudflare Tunnel "frame" (cloudflare-terraform, frame.tf) routes
+  # frame.vicio.ovh to http://frame-router:8080 over the proxy network.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: frame-router-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - frame-router
+    networks:
+      - proxy
 
 networks:
   proxy:

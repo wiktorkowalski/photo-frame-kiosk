@@ -113,30 +113,48 @@ internal static class ScreenConfigParser
         for (var i = 0; i < plan.Schedule.Count; i++)
         {
             var ruleLabel = $"{label}, schedule rule {i + 1}";
-            if (plan.Schedule[i] is null)
+            var rule = plan.Schedule[i];
+            if (rule is null)
             {
                 yield return $"{ruleLabel} is null.";
                 continue;
             }
 
-            foreach (var error in ValidateRule(ruleLabel, plan.Schedule[i], screens))
+            if (!screens.ContainsKey(rule.Screen))
+                yield return $"{ruleLabel}: screen \"{rule.Screen}\" is not in \"screens\".";
+
+            foreach (var error in ValidateWindow(ruleLabel, rule))
+                yield return error;
+        }
+
+        for (var i = 0; i < plan.Dim.Count; i++)
+        {
+            var ruleLabel = $"{label}, dim rule {i + 1}";
+            var rule = plan.Dim[i];
+            if (rule is null)
+            {
+                yield return $"{ruleLabel} is null.";
+                continue;
+            }
+
+            if (rule.Level is <= 0 or > 1)
+                yield return $"{ruleLabel}: \"level\" must be above 0 and at most 1, for example 0.85.";
+
+            foreach (var error in ValidateWindow(ruleLabel, rule))
                 yield return error;
         }
     }
 
-    private static IEnumerable<string> ValidateRule(string label, ScheduleRule rule, Dictionary<string, ScreenDefinition> screens)
+    private static IEnumerable<string> ValidateWindow(string label, TimeWindow window)
     {
-        if (!screens.ContainsKey(rule.Screen))
-            yield return $"{label}: screen \"{rule.Screen}\" is not in \"screens\".";
-
-        var fromValid = TimeOnly.TryParseExact(rule.From, TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var from);
-        var toValid = TimeOnly.TryParseExact(rule.To, TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var to);
+        var fromValid = TimeOnly.TryParseExact(window.From, TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var from);
+        var toValid = TimeOnly.TryParseExact(window.To, TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var to);
         if (!fromValid || !toValid)
             yield return $"{label}: \"from\" and \"to\" must be times like \"06:30\".";
         else if (from == to)
             yield return $"{label}: \"from\" and \"to\" are the same time.";
 
-        foreach (var day in rule.Days ?? [])
+        foreach (var day in window.Days ?? [])
         {
             if (day is null || !Days.ContainsKey(day))
                 yield return $"{label}: unknown day \"{day}\". Use mon, tue, wed, thu, fri, sat, sun.";

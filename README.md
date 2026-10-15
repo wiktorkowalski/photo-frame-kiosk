@@ -1,7 +1,10 @@
 # photo-frame-kiosk
 
 Tanie ramki Frameo jako ekrany ścienne. Każda ramka pokazuje jedną stałą stronę:
-`https://frame.home.vicio.ovh/?frame=<id>`. Co jest na tej stronie, decyduje `screens.json` w tym repo.
+`https://frame.vicio.ovh/?frame=<id>`. Co jest na tej stronie, decyduje `screens.json` w tym repo.
+
+- `frame.vicio.ovh` działa z każdej sieci: Cloudflare Tunnel do routera na homelabie (`cloudflared` obok kontenera).
+- `frame.home.vicio.ovh` działa tylko w sieci domowej, przez lokalny traefik. Nie zależy od Cloudflare.
 
 ## Zmiana ekranu
 
@@ -17,12 +20,41 @@ Typy ekranów:
 |---|---|---|
 | `clock` | — | Godzina i data |
 | `departures` | `stops` (id przystanków MZK), `title`, `limit` (1–20, domyślnie 8) | Najbliższe odjazdy MZK Zielona Góra, na żywo z GPS |
-| `url` | `url` (tylko https) | Dowolna strona w ramce `<iframe>`. Strona z `X-Frame-Options` lub CSP `frame-ancestors` zostaje pusta. |
+| `url` | `url` (tylko https) | Dowolna strona w ramce `<iframe>`. Strona z `X-Frame-Options` lub CSP `frame-ancestors` bez adresu strony ramki zostaje pusta. |
 
-Id przystanku znajdziesz na <https://frame.home.vicio.ovh/stops.html>. Każdy słupek ma własne id i własne kierunki.
+Id przystanku znajdziesz na <https://frame.vicio.ovh/stops.html>. Każdy słupek ma własne id i własne kierunki.
 
 Każda ramka w `frames` ma `default` i opcjonalny `schedule`. Pierwsza pasująca reguła wygrywa (czas Europe/Warsaw).
 Reguła z `from` późniejszym niż `to` przechodzi przez północ, a `days` oznacza dzień jej startu.
+
+### Przyciemnianie
+
+Ramka nie usypia ekranu, bo Wi-Fi ramki nie wraca po uśpieniu ekranu Androida. Zamiast tego strona kładzie czarną warstwę:
+
+```jsonc
+"dxmart": {
+  "default": "clock",
+  "dim": [{ "from": "23:00", "to": "06:30", "level": 0.85 }]
+}
+```
+
+- `level` to krycie warstwy: od powyżej 0 do 1. `0.85` zostawia 15 % jasności, `1` daje pełną czerń.
+- `from`, `to` i `days` działają jak w `schedule`. Pierwsza pasująca reguła wygrywa.
+- Dotyk przechodzi przez warstwę. Zmiana przyciemnienia nie przeładowuje ekranu, np. strony HA w `<iframe>`.
+
+### Home Assistant
+
+Ekran `ha` w `screens.json` pokazuje dashboard `dashboard-kiosk`. Wymagania:
+
+- Traefik na homelab dodaje do `ha.home.vicio.ovh` nagłówek `Content-Security-Policy: frame-ancestors 'self' https://frame.home.vicio.ovh https://frame.vicio.ovh`
+  (middleware `ha-frame-ancestors` w `/home/ubuntu/docker/traefik/dynamic/middlewares.yml`).
+  Przeglądarka ignoruje wtedy `X-Frame-Options` z traefika i z HA. Config HA zostaje bez zmian.
+- Logowanie: raz, dotykiem na ramce, z zaznaczonym „Keep me logged in”. Użyj osobnego użytkownika HA bez uprawnień admina.
+  HA trzyma token w `localStorage` ramki, więc logowanie przeżywa przeładowania strony.
+  Wyczyszczenie danych aplikacji kiosku wymaga ponownego logowania.
+- `trusted_networks` nie działa: middleware `ha-headers` usuwa `X-Forwarded-For`, więc HA widzi adres traefika, nie ramki.
+
+Pierwsze logowanie: ustaw `"default": "ha"` dla ramki, zaloguj się na ramce, potem ustaw plan według potrzeb.
 
 ## Układ repo
 

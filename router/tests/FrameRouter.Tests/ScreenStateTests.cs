@@ -11,7 +11,11 @@ public sealed class ScreenStateTests : IDisposable
         {
           "screens": { "clock": { "type": "clock" }, "departures": { "type": "departures", "stops": [11] } },
           "frames": {
-            "kitchen": { "default": "clock", "schedule": [{ "screen": "departures", "from": "06:30", "to": "09:00" }] },
+            "kitchen": {
+              "default": "clock",
+              "schedule": [{ "screen": "departures", "from": "06:30", "to": "09:00" }],
+              "dim": [{ "from": "23:00", "to": "06:30", "level": 0.85 }]
+            },
             "hall": { "default": "departures" }
           }
         }
@@ -46,6 +50,21 @@ public sealed class ScreenStateTests : IDisposable
     }
 
     [Fact]
+    public async Task GetSnapshot_DimWindowEnds_ClearsDimAndKeepsTheScreenRulesAsync()
+    {
+        Assert.Empty(await _configStore.ApplyAsync(Config, CancellationToken.None));
+        Assert.Equal(0.85, _screenState.GetSnapshot("kitchen").Dim);
+        Assert.Equal(0, _screenState.GetSnapshot("hall").Dim);
+
+        _time.Advance(TimeSpan.FromMinutes(1));
+        _screenState.Refresh();
+
+        var snapshot = _screenState.GetSnapshot("kitchen");
+        Assert.Equal(0, snapshot.Dim);
+        Assert.Equal("departures", snapshot.Name);
+    }
+
+    [Fact]
     public async Task GetSnapshot_UnknownFrame_HasNoScreenAsync()
     {
         Assert.Empty(await _configStore.ApplyAsync(Config, CancellationToken.None));
@@ -54,6 +73,31 @@ public sealed class ScreenStateTests : IDisposable
 
         Assert.Null(snapshot.Screen);
         Assert.Equal("garage", snapshot.Frame);
+    }
+
+    [Fact]
+    public async Task StreamAsync_OnlyDimChanges_YieldsTheNewSnapshotAsync()
+    {
+        const string dimOnly = """
+            {
+              "screens": { "clock": { "type": "clock" } },
+              "frames": { "kitchen": { "default": "clock", "dim": [{ "from": "06:30", "to": "07:00", "level": 0.5 }] } }
+            }
+            """;
+        Assert.Empty(await _configStore.ApplyAsync(dimOnly, CancellationToken.None));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await using var stream = _screenState.StreamAsync("kitchen", cancellation.Token, CancellationToken.None).GetAsyncEnumerator(cancellation.Token);
+
+        Assert.True(await stream.MoveNextAsync());
+        Assert.Equal(0, stream.Current.Data.Dim);
+
+        var next = stream.MoveNextAsync();
+        _time.Advance(TimeSpan.FromSeconds(10));
+        _screenState.Refresh();
+
+        Assert.True(await next);
+        Assert.Equal(0.5, stream.Current.Data.Dim);
+        Assert.Equal("clock", stream.Current.Data.Name);
     }
 
     [Fact]

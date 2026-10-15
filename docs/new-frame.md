@@ -4,7 +4,8 @@ Ta instrukcja opisuje drogę sprawdzoną 15.10.2026 na ramce Dxmart ZN-DP1002 (S
 Inne modele mogą się różnić. Opisy innych ramek są w repo
 [wesbos/photo-frame-dashboard](https://github.com/wesbos/photo-frame-dashboard) (`docs/devices.md`).
 
-Cel: ramka po starcie pokazuje stronę `https://frame.home.vicio.ovh/?frame=<id>`.
+Cel: ramka po starcie pokazuje stronę `https://frame.vicio.ovh/?frame=<id>`.
+Ramka potrzebuje tylko Wi-Fi z internetem. Sieć domowa jest potrzebna tylko dla ekranu Home Assistant.
 O treści decyduje `screens.json` w tym repo. Frameo i aktualizatory producenta są wyłączone.
 
 ## Zasady
@@ -102,8 +103,9 @@ Back i Dashboard poza kioskiem. W kiosku przytrzymaj dwa nieruchome palce przez 
 scripts/set-kiosk-url.sh kuchnia
 ```
 
-Ramka musi rozwiązać `frame.home.vicio.ovh` na `192.168.1.12` i dosięgnąć tego adresu na porcie 443.
-W osobnym VLAN-ie sprawdź regułę zapory.
+Domyślny adres `https://frame.vicio.ovh` działa z każdej sieci z internetem.
+W sieci domowej możesz użyć `ROUTER_URL=https://frame.home.vicio.ovh` (lokalny traefik, bez Cloudflare).
+Wtedy ramka musi dosięgnąć `192.168.1.12` na porcie 443; w osobnym VLAN-ie sprawdź regułę zapory.
 
 ## 9. Wyłącz Frameo
 
