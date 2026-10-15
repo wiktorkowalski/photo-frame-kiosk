@@ -1,5 +1,6 @@
 # Copy of /home/ubuntu/docker/frame-router/compose.yml on the homelab host.
-# .env next to it holds FrameRouter__ConfigToken (same value as the FRAME_ROUTER_CONFIG_TOKEN repo secret)
+# .env next to it holds FrameRouter__ConfigToken (same value as the FRAME_ROUTER_CONFIG_TOKEN repo secret),
+# FrameRouter__ControlToken (the control page and /api/control; openssl rand -hex 32, kept only in .env)
 # and TUNNEL_TOKEN (terraform output -raw frame_tunnel_token in cloudflare-terraform).
 services:
   frame-router:

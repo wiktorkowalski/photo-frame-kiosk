@@ -31,7 +31,7 @@ public sealed class ScreenStateTests : IDisposable
     {
         var options = Options.Create(new FrameRouterOptions { DataDirectory = _dataDirectory });
         _configStore = new ConfigStore(options, NullLogger<ConfigStore>.Instance);
-        _screenState = new ScreenState(_configStore, _time, options, NullLogger<ScreenState>.Instance);
+        _screenState = new ScreenState(_configStore, CreateOverrideStore(), _time, options, NullLogger<ScreenState>.Instance);
     }
 
     public void Dispose() => Directory.Delete(_dataDirectory, recursive: true);
@@ -140,4 +140,93 @@ public sealed class ScreenStateTests : IDisposable
 
         Assert.Contains("hall", restarted.Current.Frames.Keys);
     }
+
+    [Fact]
+    public async Task GetSnapshot_OverrideActive_WinsOverTheScheduleUntilItEndsAsync()
+    {
+        Assert.Empty(await _configStore.ApplyAsync(Config, CancellationToken.None));
+
+        _screenState.SetOverride("kitchen", "departures", TimeSpan.FromMinutes(30));
+
+        var overridden = _screenState.GetSnapshot("kitchen");
+        Assert.Equal("departures", overridden.Name);
+        Assert.Equal(_time.GetUtcNow().AddMinutes(30), overridden.OverrideUntil);
+        Assert.Equal(0.85, overridden.Dim);
+        Assert.Null(_screenState.GetSnapshot("hall").OverrideUntil);
+
+        // The schedule says departures from 06:30 to 09:00; this override says clock until 07:00.
+        _screenState.SetOverride("kitchen", "clock", TimeSpan.FromMinutes(30));
+        _time.Advance(TimeSpan.FromMinutes(29));
+        _screenState.Refresh();
+        Assert.Equal("clock", _screenState.GetSnapshot("kitchen").Name);
+
+        _time.Advance(TimeSpan.FromMinutes(1));
+        _screenState.Refresh();
+
+        var expired = _screenState.GetSnapshot("kitchen");
+        Assert.Equal("departures", expired.Name);
+        Assert.Null(expired.OverrideUntil);
+    }
+
+    [Fact]
+    public async Task GetSnapshot_OverrideCleared_ReturnsToTheScheduleAsync()
+    {
+        Assert.Empty(await _configStore.ApplyAsync(Config, CancellationToken.None));
+        _screenState.SetOverride("hall", "clock", TimeSpan.FromHours(1));
+        Assert.Equal("clock", _screenState.GetSnapshot("hall").Name);
+
+        _screenState.ClearOverride("hall");
+
+        Assert.Equal("departures", _screenState.GetSnapshot("hall").Name);
+    }
+
+    [Fact]
+    public async Task GetSnapshot_PushRemovesTheOverrideScreen_FallsBackToTheScheduleAsync()
+    {
+        const string withoutClock = """
+            { "screens": { "departures": { "type": "departures", "stops": [11] } }, "frames": { "hall": { "default": "departures" } } }
+            """;
+        Assert.Empty(await _configStore.ApplyAsync(Config, CancellationToken.None));
+        _screenState.SetOverride("hall", "clock", TimeSpan.FromHours(1));
+
+        Assert.Empty(await _configStore.ApplyAsync(withoutClock, CancellationToken.None));
+        _screenState.Refresh();
+
+        var snapshot = _screenState.GetSnapshot("hall");
+        Assert.Equal("departures", snapshot.Name);
+        Assert.Null(snapshot.OverrideUntil);
+    }
+
+    [Fact]
+    public async Task StreamAsync_OverrideSet_YieldsTheNewSnapshotAsync()
+    {
+        Assert.Empty(await _configStore.ApplyAsync(Config, CancellationToken.None));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await using var stream = _screenState.StreamAsync("hall", cancellation.Token, CancellationToken.None).GetAsyncEnumerator(cancellation.Token);
+        Assert.True(await stream.MoveNextAsync());
+
+        var next = stream.MoveNextAsync();
+        _screenState.SetOverride("hall", "clock", TimeSpan.FromMinutes(5));
+
+        Assert.True(await next);
+        Assert.Equal("clock", stream.Current.Data.Name);
+    }
+
+    [Fact]
+    public void Load_AfterRestart_KeepsActiveOverridesAndDropsExpiredOnes()
+    {
+        var store = CreateOverrideStore();
+        store.Set("kitchen", "clock", TimeSpan.FromMinutes(10));
+        store.Set("hall", "clock", TimeSpan.FromMinutes(60));
+        _time.Advance(TimeSpan.FromMinutes(30));
+        var restarted = CreateOverrideStore();
+
+        restarted.Load();
+
+        Assert.Null(restarted.GetActive("kitchen"));
+        Assert.Equal("clock", restarted.GetActive("hall")?.Screen);
+    }
+
+    private OverrideStore CreateOverrideStore() =>
+        new(Options.Create(new FrameRouterOptions { DataDirectory = _dataDirectory }), _time, NullLogger<OverrideStore>.Instance);
 }

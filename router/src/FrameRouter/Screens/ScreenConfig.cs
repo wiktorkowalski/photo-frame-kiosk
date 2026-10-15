@@ -9,6 +9,9 @@ internal sealed record ScreenConfig
 
 internal sealed record FramePlan
 {
+    // Shown on the control page, for example "Kuchnia". The frame id is shown when it is missing.
+    public string? Label { get; init; }
+
     public required string Default { get; init; }
 
     public IReadOnlyList<ScheduleRule> Schedule { get; init; } = [];

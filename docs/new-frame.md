@@ -91,9 +91,10 @@ Back i Dashboard poza kioskiem. W kiosku przytrzymaj dwa nieruchome palce przez 
 2. Dodaj wpis w `frames`:
 
 ```json
-"kuchnia": { "default": "clock" }
+"kuchnia": { "label": "Kuchnia", "default": "clock" }
 ```
 
+   `label` to nazwa ramki na stronie sterowania (`/control.html`).
 3. Zrób commit i push na `master`. Workflow **Push screens** wyśle plik do routera.
    Czerwony przebieg oznacza błąd w pliku. Treść błędu jest w logu przebiegu.
 

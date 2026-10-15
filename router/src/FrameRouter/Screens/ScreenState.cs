@@ -5,9 +5,10 @@ using Microsoft.Extensions.Options;
 namespace FrameRouter.Screens;
 
 // Screen is null when screens.json has no entry for the frame. Dim is the opacity of the black overlay, 0 for none.
-internal sealed record ScreenSnapshot(string Frame, string? Name, ScreenDefinition? Screen, double Dim, string Version);
+// OverrideUntil is set while a screen from the control page wins over the schedule.
+internal sealed record ScreenSnapshot(string Frame, string? Name, ScreenDefinition? Screen, double Dim, DateTimeOffset? OverrideUntil, string Version);
 
-internal sealed class ScreenState(ConfigStore configStore, TimeProvider timeProvider, IOptions<FrameRouterOptions> options, ILogger<ScreenState> logger)
+internal sealed class ScreenState(ConfigStore configStore, OverrideStore overrideStore, TimeProvider timeProvider, IOptions<FrameRouterOptions> options, ILogger<ScreenState> logger)
 {
     public const string EventType = "screen";
 
@@ -30,6 +31,18 @@ internal sealed class ScreenState(ConfigStore configStore, TimeProvider timeProv
     {
         lock (_gate)
             RefreshLocked();
+    }
+
+    public void SetOverride(string frameId, string screen, TimeSpan duration)
+    {
+        overrideStore.Set(frameId, screen, duration);
+        Refresh();
+    }
+
+    public void ClearOverride(string frameId)
+    {
+        overrideStore.Clear(frameId);
+        Refresh();
     }
 
     public async IAsyncEnumerable<SseItem<ScreenSnapshot>> StreamAsync(string frameId, [EnumeratorCancellation] CancellationToken requestAborted, CancellationToken appStopping)
@@ -59,7 +72,7 @@ internal sealed class ScreenState(ConfigStore configStore, TimeProvider timeProv
 
         return _snapshots!.TryGetValue(frameId, out var snapshot)
             ? snapshot
-            : new ScreenSnapshot(frameId, null, null, 0, AppVersion.Value);
+            : new ScreenSnapshot(frameId, null, null, 0, null, AppVersion.Value);
     }
 
     private void RefreshLocked()
@@ -68,7 +81,7 @@ internal sealed class ScreenState(ConfigStore configStore, TimeProvider timeProv
         var localNow = TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), _timeZone).DateTime;
         var next = config.Frames.ToDictionary(
             frame => frame.Key,
-            frame => Resolve(config, frame.Key, frame.Value, localNow),
+            frame => Resolve(config, frame.Key, frame.Value, overrideStore.GetActive(frame.Key), localNow),
             StringComparer.Ordinal);
 
         var changedFrames = next.Values.Where(snapshot => _snapshots?.GetValueOrDefault(snapshot.Frame) != snapshot).ToList();
@@ -76,7 +89,7 @@ internal sealed class ScreenState(ConfigStore configStore, TimeProvider timeProv
             return;
 
         foreach (var snapshot in changedFrames)
-            logger.LogInformation("Frame {FrameId} now shows screen {ScreenName} with dim {DimLevel}", snapshot.Frame, snapshot.Name, snapshot.Dim);
+            logger.LogInformation("Frame {FrameId} now shows screen {ScreenName} with dim {DimLevel}, override until {OverrideUntil}", snapshot.Frame, snapshot.Name, snapshot.Dim, snapshot.OverrideUntil);
 
         _snapshots = next;
         var previous = _changed;
@@ -84,10 +97,14 @@ internal sealed class ScreenState(ConfigStore configStore, TimeProvider timeProv
         previous.SetResult();
     }
 
-    private static ScreenSnapshot Resolve(ScreenConfig config, string frameId, FramePlan plan, DateTime localNow)
+    private static ScreenSnapshot Resolve(ScreenConfig config, string frameId, FramePlan plan, ScreenOverride? screenOverride, DateTime localNow)
     {
-        var name = ScheduleResolver.Resolve(plan, localNow);
-        return new ScreenSnapshot(frameId, name, config.Screens[name], ScheduleResolver.ResolveDim(plan, localNow), AppVersion.Value);
+        // An override whose screen a later push removed falls back to the schedule.
+        if (screenOverride is not null && !config.Screens.ContainsKey(screenOverride.Screen))
+            screenOverride = null;
+
+        var name = screenOverride?.Screen ?? ScheduleResolver.Resolve(plan, localNow);
+        return new ScreenSnapshot(frameId, name, config.Screens[name], ScheduleResolver.ResolveDim(plan, localNow), screenOverride?.Until, AppVersion.Value);
     }
 
     private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);

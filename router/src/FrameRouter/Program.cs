@@ -6,6 +6,7 @@ builder.Services.AddFrameRouter();
 
 var app = builder.Build();
 app.Services.GetRequiredService<ConfigStore>().Load();
+app.Services.GetRequiredService<OverrideStore>().Load();
 
 app.UseDefaultFiles();
 // The frame page must pick up a new frame.js after a deploy; a revalidation per load is cheap on the LAN.

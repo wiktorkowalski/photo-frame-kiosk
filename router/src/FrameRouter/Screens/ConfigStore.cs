@@ -48,11 +48,7 @@ internal sealed class ConfigStore(IOptions<FrameRouterOptions> options, ILogger<
         await _writeGate.WaitAsync(cancellationToken);
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_savedPath))!);
-            // Write then rename: a crash mid-write must not leave a half file for the next start.
-            var tempPath = _savedPath + ".tmp";
-            await File.WriteAllTextAsync(tempPath, json, cancellationToken);
-            File.Move(tempPath, _savedPath, overwrite: true);
+            AtomicFile.WriteAllText(_savedPath, json);
             Volatile.Write(ref _current, result.Config);
         }
         finally

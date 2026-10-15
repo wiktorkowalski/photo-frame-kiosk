@@ -26,6 +26,7 @@ Id przystanku znajdziesz na <https://frame.vicio.ovh/stops.html>. Każdy słupek
 
 Każda ramka w `frames` ma `default` i opcjonalny `schedule`. Pierwsza pasująca reguła wygrywa (czas Europe/Warsaw).
 Reguła z `from` późniejszym niż `to` przechodzi przez północ, a `days` oznacza dzień jej startu.
+Opcjonalne `label` (np. `"Kuchnia"`) to nazwa ramki na stronie sterowania. Bez `label` strona pokazuje id ramki.
 
 ### Przyciemnianie
 
@@ -56,6 +57,56 @@ Ekran `ha` w `screens.json` pokazuje dashboard `dashboard-kiosk`. Wymagania:
 
 Pierwsze logowanie: ustaw `"default": "ha"` dla ramki, zaloguj się na ramce, potem ustaw plan według potrzeb.
 
+## Sterowanie ze strony
+
+<https://frame.vicio.ovh/control.html> (z telefonu, z każdej sieci). Strona pokazuje wszystkie ramki z `screens.json`.
+
+1. Przy pierwszym wejściu wklej token sterowania. Strona trzyma go w pamięci przeglądarki telefonu.
+2. Wybierz czas („Pokaż przez”, domyślnie 30 min).
+3. Stuknij ekran przy ramce. Ramka przełącza się w kilka sekund.
+4. „Wróć do harmonogramu” kończy nadpisanie od razu.
+
+Zasady nadpisania:
+
+- Nadpisanie kończy się samo po wybranym czasie (1 min do 24 h). Ramka wraca do `schedule` i `default` z `screens.json`.
+  Koniec dociera do ramki z opóźnieniem do 15 s.
+- Push `screens.json` nie kasuje nadpisania. Nadpisanie znika wcześniej tylko wtedy, gdy push usunie jego ekran.
+- Przyciemnianie (`dim`) działa dalej według `screens.json`.
+- Nadpisania leżą w `/app/data/overrides.json` i przeżywają restart kontenera. Nic nie trafia do repo.
+
+Token sterowania to `FrameRouter__ControlToken` w `.env` na hoście. Odczyt:
+
+```sh
+ssh ubuntu grep ControlToken /home/ubuntu/docker/frame-router/.env
+```
+
+Token może tylko nadpisywać ekrany. Nie zmienia `screens.json`. Bez tokena w `.env` sterowanie jest wyłączone (403).
+
+### API sterowania
+
+Każde wywołanie potrzebuje nagłówka `Authorization: Bearer <token sterowania>`.
+
+| Metoda i ścieżka | Ciało | Działanie |
+|---|---|---|
+| `GET /api/control/frames` | — | Ramki, ich ekran i koniec nadpisania, lista ekranów |
+| `PUT /api/control/frames/<id>/override` | `{"screen": "departures", "minutes": 30}` | Pokazuje ekran przez podany czas |
+| `DELETE /api/control/frames/<id>/override` | — | Wraca do harmonogramu |
+
+Przykład dla Home Assistant (`configuration.yaml`, token w `secrets.yaml` jako `frame_control_auth: "Bearer <token>"`):
+
+```yaml
+rest_command:
+  frame_show:
+    url: "https://frame.vicio.ovh/api/control/frames/{{ frame }}/override"
+    method: put
+    headers:
+      Authorization: !secret frame_control_auth
+    content_type: "application/json"
+    payload: '{"screen": "{{ screen }}", "minutes": {{ minutes | default(30) }}}'
+```
+
+Wywołanie: akcja `rest_command.frame_show` z danymi `frame: dxmart`, `screen: departures`, `minutes: 20`.
+
 ## Układ repo
 
 - `router/` — aplikacja .NET 10 (minimal API) i strona ramki. Strona to czysty JS bez kroku budowania,
@@ -72,6 +123,7 @@ Pierwsze logowanie: ustaw `"default": "ha"` dla ramki, zaloguj się na ramce, po
 - Po wdrożeniu nowej wersji strona przeładowuje się sama. Codziennie o 4:00 przeładowuje się też dla porządku w pamięci.
 - Odjazdy pochodzą z nieudokumentowanego API strony MZK (`rj.mzk.zgora.pl`). Router trzyma odpowiedź 15 s w pamięci.
 - Ostatni wysłany `screens.json` leży w `/app/data` i przeżywa restart kontenera.
+- Kolejność dla ekranu: aktywne nadpisanie ze strony sterowania, potem pierwsza pasująca reguła `schedule`, potem `default`.
 
 ## Wdrożenie
 
@@ -83,7 +135,7 @@ Lokalnie:
 
 ```sh
 cd router && dotnet test
-FrameRouter__ConfigToken=dev dotnet run --project src/FrameRouter
+FrameRouter__ConfigToken=dev FrameRouter__ControlToken=dev dotnet run --project src/FrameRouter
 ```
 
 Strona: <http://localhost:5000/?frame=dxmart> (port podaje `dotnet run`).

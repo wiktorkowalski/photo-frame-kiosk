@@ -21,6 +21,7 @@ internal static class ServiceCollectionExtensions
         services.AddSingleton(TimeProvider.System);
 
         services.AddSingleton<ConfigStore>();
+        services.AddSingleton<OverrideStore>();
         services.AddSingleton<ScreenState>();
         services.AddHostedService<ScreenTicker>();
 
