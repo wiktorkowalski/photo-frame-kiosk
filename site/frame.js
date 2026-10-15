@@ -2,6 +2,10 @@
 // keep to ES2020 and to APIs Chrome 106 has.
 import { isValidFrameId, localNow, resolveDimLevel, resolveScreenName, TIME_ZONE } from './schedule.js';
 
+// tools/build-site.mjs replaces 'dev' with the hash of the page code and adds ?v=<hash> to every
+// script URL, so a reload after a deploy fetches the new code past the 10 min Pages cache.
+const CODE_VERSION = 'dev';
+
 const CONFIG_POLL_MS = 60000;
 const SCHEDULE_TICK_MS = 15000;
 const FETCH_TIMEOUT_MS = 15000;
@@ -9,6 +13,9 @@ const OFFLINE_NOTICE_MS = 180000;
 const DEPARTURES_REFRESH_MS = 20000;
 const DEPARTURES_STALE_MS = 90000;
 const RELOAD_RETRY_MS = 300000;
+// Pages may serve the old index.html for up to 10 min after a deploy: allow one update reload per window.
+const UPDATE_RELOAD_GAP_MS = 600000;
+const UPDATE_RELOAD_KEY = 'frame-update-reload-at';
 const NIGHTLY_RELOAD_HOUR = 4; // a daily reload keeps WebView memory in check on 1 GB frames
 const CONFIG_CACHE_KEY = 'frame-config';
 
@@ -19,7 +26,6 @@ const params = new URLSearchParams(location.search);
 const frameId = params.get('frame') || '';
 
 let config = null;
-let loadedVersion = null;
 let lastConfigAt = 0;
 let currentKey = null;
 let disposeScreen = function () {};
@@ -75,10 +81,30 @@ function cacheConfig(value) {
 
 function show(key, render) {
   if (key === currentKey) return;
-  currentKey = key;
   disposeScreen();
+  disposeScreen = function () {};
   root.textContent = '';
-  disposeScreen = render(root) || function () {};
+  try {
+    disposeScreen = render(root) || function () {};
+  } catch (error) {
+    // Without this a renderer error leaves the screen blank: the next tick sees the same key and skips.
+    root.textContent = '';
+    root.appendChild(el('div', 'message', 'Błąd ekranu: ' + error.message));
+  }
+  currentKey = key;
+}
+
+function reloadForUpdate() {
+  let last = 0;
+  try {
+    last = Number(sessionStorage.getItem(UPDATE_RELOAD_KEY)) || 0;
+    if (Date.now() - last < UPDATE_RELOAD_GAP_MS) return;
+    sessionStorage.setItem(UPDATE_RELOAD_KEY, String(Date.now()));
+  } catch (error) {
+    // No sessionStorage: skip the update reload; the 04:00 reload brings the new code.
+    return;
+  }
+  location.reload();
 }
 
 function showMessage(text) {
@@ -106,7 +132,11 @@ function applySchedule() {
 
   const name = resolveScreenName(plan, now);
   const screen = config.screens[name];
-  const renderer = renderers[screen.type];
+  const renderer = screen && renderers[screen.type];
+  if (!renderer) {
+    showMessage('Ekran „' + name + '” ma nieznany typ. Strona przeładuje się po aktualizacji.');
+    return;
+  }
   show(name + ':' + JSON.stringify(screen), function (host) {
     return renderer(host, screen);
   });
@@ -115,12 +145,7 @@ function applySchedule() {
 async function refreshConfig() {
   try {
     const next = await fetchConfig();
-    if (loadedVersion === null) {
-      loadedVersion = next.version;
-    } else if (next.version !== loadedVersion) {
-      location.reload();
-      return;
-    }
+    if (CODE_VERSION !== 'dev' && next.version !== CODE_VERSION) reloadForUpdate();
     config = next;
     lastConfigAt = Date.now();
     cacheConfig(next);

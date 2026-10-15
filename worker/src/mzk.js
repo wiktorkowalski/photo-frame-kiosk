@@ -12,7 +12,7 @@ function decode(value) {
   return value.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (match, entity) => {
     if (entity[0] === '#') {
       const code = entity[1] === 'x' || entity[1] === 'X' ? parseInt(entity.slice(2), 16) : parseInt(entity.slice(1), 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : match;
+      return Number.isFinite(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match;
     }
     return ENTITIES[entity.toLowerCase()] ?? match;
   });

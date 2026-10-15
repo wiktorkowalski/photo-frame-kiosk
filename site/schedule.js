@@ -3,6 +3,9 @@
 
 export const SCREEN_TYPES = ['clock', 'departures', 'url'];
 export const MAX_DEPARTURE_LIMIT = 20;
+// Shared with the MZK Worker, which rejects larger requests.
+export const MAX_STOPS_PER_SCREEN = 6;
+export const MAX_STOP_ID = 999999;
 export const TIME_ZONE = 'Europe/Warsaw';
 
 export const DAYS = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
@@ -124,8 +127,10 @@ function validateScreen(name, screen) {
   if (screen.type === 'departures') {
     if (!Array.isArray(screen.stops) || screen.stops.length === 0) {
       errors.push(`${label}: "stops" needs at least one MZK busStopId.`);
-    } else if (!screen.stops.every((id) => Number.isInteger(id) && id > 0)) {
-      errors.push(`${label}: every stop id must be a positive whole number.`);
+    } else if (screen.stops.length > MAX_STOPS_PER_SCREEN) {
+      errors.push(`${label}: at most ${MAX_STOPS_PER_SCREEN} stops per screen.`);
+    } else if (!screen.stops.every((id) => Number.isInteger(id) && id > 0 && id <= MAX_STOP_ID)) {
+      errors.push(`${label}: every stop id must be a whole number from 1 to ${MAX_STOP_ID}.`);
     }
     if (screen.limit !== undefined && !(Number.isInteger(screen.limit) && screen.limit >= 1 && screen.limit <= MAX_DEPARTURE_LIMIT)) {
       errors.push(`${label}: "limit" must be a whole number from 1 to ${MAX_DEPARTURE_LIMIT}.`);

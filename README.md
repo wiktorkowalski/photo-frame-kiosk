@@ -62,7 +62,7 @@ Pierwsze logowanie: ustaw `"default": "ha"` dla ramki, zaloguj się na ramce, po
 - `site/` — strona ramki i wyszukiwarka przystanków. Czysty JS (moduły ES2020) bez kroku budowania,
   pisany pod WebView 106 (Chrome 106): bez zagnieżdżania CSS i nowszych API.
   `site/schedule.js` ma walidację `screens.json` i harmonogram; używa go strona i build.
-- `screens.json` — konfiguracja ekranów i ramek. Komentarze `//` są dozwolone.
+- `screens.json` — konfiguracja ekranów i ramek. Komentarze `//` i `/* */` oraz przecinki na końcu list są dozwolone.
 - `tools/build-site.mjs` — sprawdza `screens.json` i składa stronę z `config.json` do `_site/`.
 - `worker/` — Cloudflare Worker `frame-mzk`: pośrednik do API MZK. MZK nie wysyła nagłówków CORS,
   więc przeglądarka ramki nie może pytać MZK wprost.
@@ -72,15 +72,19 @@ Pierwsze logowanie: ustaw `"default": "ha"` dla ramki, zaloguj się na ramce, po
 ## Jak to działa
 
 - Strona co minutę pobiera `config.json` (z parametrem, który omija 10-minutowy cache Pages) i co 15 s liczy ekran z harmonogramu.
-- Ostatnia dobra konfiguracja leży w `localStorage`. Gdy sieć padnie, ramka dalej pokazuje plan i harmonogram.
-- `config.json` ma wersję kodu strony. Po zmianie kodu strona przeładowuje się sama.
+- Ostatnia dobra konfiguracja leży w `localStorage`. Gdy sieć padnie przy otwartej stronie, ramka dalej pokazuje plan i harmonogram.
+  Restart ramki bez sieci kończy się stroną błędu WebView, aż kiosk ponowi ładowanie.
+- `config.json` ma wersję kodu strony. Po zmianie kodu strona przeładowuje się sama (najwyżej raz na 10 min,
+  bo Pages trzyma stary `index.html` do 10 min). Skrypty mają w adresie `?v=<wersja>`, więc cache WebView ich nie podmienia.
   Codziennie o 4:00 przeładowuje się też dla porządku w pamięci, ale tylko gdy strona odpowiada.
-- Odjazdy idą przez Worker. Worker trzyma odpowiedź MZK 15 s w cache Cloudflare.
+- Odjazdy idą przez Worker. Worker prosi Cloudflare o 15 s cache odpowiedzi MZK; log Workera (`MZK edge cache status`) pokazuje, czy działa.
+  Worker przyjmuje zapytania tylko ze strony ramki (nagłówek `Origin`) i bez `Origin` (curl).
 
 ## Wdrożenie
 
 - **Pages** (`.github/workflows/pages.yml`): każdy push na `master`. Testy, sprawdzenie `screens.json`, publikacja.
-  Adres Workera bierze ze zmiennej repo `MZK_API_URL`.
+  Adres Workera bierze ze zmiennej repo `MZK_API_URL`. Bez niej build z ekranem `departures` kończy się błędem.
+  Źródło Pages w ustawieniach repo: **GitHub Actions**.
 - **Worker** (`.github/workflows/worker.yml`): push zmieniający `worker/`. Wymaga sekretów repo
   `CLOUDFLARE_API_TOKEN` (uprawnienie Workers Scripts: Edit) i `CLOUDFLARE_ACCOUNT_ID`.
 

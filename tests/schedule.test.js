@@ -37,7 +37,9 @@ test('a misspelled key is an error', () => {
 for (const [screen, expected] of [
   [{ type: 'weather' }, 'unknown type'],
   [{ type: 'departures', stops: [] }, 'at least one MZK busStopId'],
-  [{ type: 'departures', stops: [11.5] }, 'positive whole number'],
+  [{ type: 'departures', stops: [11.5] }, 'whole number from 1'],
+  [{ type: 'departures', stops: [1000000] }, 'whole number from 1'],
+  [{ type: 'departures', stops: [1, 2, 3, 4, 5, 6, 7] }, 'at most 6 stops'],
   [{ type: 'departures', stops: [11], limit: 50 }, '"limit" must be'],
   [{ type: 'url', url: 'http://ha.local' }, 'absolute https'],
   [null, 'must be an object'],

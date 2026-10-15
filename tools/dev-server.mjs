@@ -23,7 +23,8 @@ createServer(async (request, response) => {
 }).listen(SITE_PORT, () => console.log(`site   http://localhost:${SITE_PORT}/?frame=dxmart&mzk=http://localhost:${WORKER_PORT}`));
 
 createServer(async (request, response) => {
-  const result = await worker.fetch(new Request(new URL(request.url, `http://localhost:${WORKER_PORT}`), { method: request.method }));
+  const headers = Object.entries(request.headers).filter(([, value]) => typeof value === 'string');
+  const result = await worker.fetch(new Request(new URL(request.url, `http://localhost:${WORKER_PORT}`), { method: request.method, headers }));
   response.writeHead(result.status, Object.fromEntries(result.headers));
   response.end(Buffer.from(await result.arrayBuffer()));
 }).listen(WORKER_PORT, () => console.log(`worker http://localhost:${WORKER_PORT}/departures?stops=11`));
