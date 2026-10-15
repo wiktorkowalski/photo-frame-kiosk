@@ -61,7 +61,7 @@ public sealed class ScreenStateTests : IDisposable
     {
         Assert.Empty(await _configStore.ApplyAsync(Config, CancellationToken.None));
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        await using var stream = _screenState.StreamAsync("kitchen", cancellation.Token).GetAsyncEnumerator(cancellation.Token);
+        await using var stream = _screenState.StreamAsync("kitchen", cancellation.Token, CancellationToken.None).GetAsyncEnumerator(cancellation.Token);
 
         Assert.True(await stream.MoveNextAsync());
         Assert.Equal("clock", stream.Current.Data.Name);

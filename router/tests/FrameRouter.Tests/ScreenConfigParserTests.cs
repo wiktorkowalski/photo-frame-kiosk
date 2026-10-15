@@ -44,7 +44,8 @@ public sealed class ScreenConfigParserTests
     [InlineData("""{ "type": "weather" }""", "unknown type")]
     [InlineData("""{ "type": "departures", "stops": [] }""", "at least one MZK busStopId")]
     [InlineData("""{ "type": "departures", "stops": [11], "limit": 50 }""", "\"limit\" must be between")]
-    [InlineData("""{ "type": "url", "url": "ftp://example.org" }""", "absolute http or https")]
+    [InlineData("""{ "type": "url", "url": "ftp://example.org" }""", "absolute https")]
+    [InlineData("""{ "type": "url", "url": "http://ha.local" }""", "absolute https")]
     public void Parse_InvalidScreen_ReportsError(string screen, string expected)
     {
         var json = $$"""{ "screens": { "clock": { "type": "clock" }, "bad": {{screen}} }, "frames": { "kitchen": { "default": "clock" } } }""";
@@ -68,6 +69,21 @@ public sealed class ScreenConfigParserTests
 
         Assert.Null(result.Config);
         Assert.Contains(result.Errors, error => error.Contains(expected, StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("""{ "screens": { "clock": { "type": "clock" } }, "frames": { "kitchen": { "default": null } } }""")]
+    [InlineData("""{ "screens": { "clock": { "type": "clock" } }, "frames": { "kitchen": { "default": "clock", "schedule": null } } }""")]
+    [InlineData("""{ "screens": { "clock": null }, "frames": { "kitchen": { "default": "clock" } } }""")]
+    [InlineData("""{ "screens": { "clock": { "type": "clock" } }, "frames": { "kitchen": null } }""")]
+    [InlineData("""{ "screens": { "clock": { "type": "clock" } }, "frames": { "kitchen": { "default": "clock", "schedule": [null] } } }""")]
+    [InlineData("""{ "screens": { "clock": { "type": "clock" } }, "frames": { "kitchen": { "default": "clock", "schedule": [{ "screen": "clock", "from": "06:00", "to": "07:00", "days": [null] }] } } }""")]
+    public void Parse_NullValue_ReportsErrorWithoutThrowing(string json)
+    {
+        var result = ScreenConfigParser.Parse(json);
+
+        Assert.Null(result.Config);
+        Assert.NotEmpty(result.Errors);
     }
 
     [Theory]

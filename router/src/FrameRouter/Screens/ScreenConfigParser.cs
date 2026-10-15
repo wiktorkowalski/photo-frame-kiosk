@@ -18,6 +18,7 @@ internal static class ScreenConfigParser
         ReadCommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true,
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+        RespectNullableAnnotations = true,
     };
 
     public static readonly IReadOnlyDictionary<string, DayOfWeek> Days = new Dictionary<string, DayOfWeek>(StringComparer.Ordinal)
@@ -66,11 +67,12 @@ internal static class ScreenConfigParser
         if (config.Frames.Count == 0)
             errors.Add("\"frames\" is empty. Add one entry per frame, for example \"kitchen\".");
 
+        // RespectNullableAnnotations does not reach dictionary values or list items.
         foreach (var (name, screen) in config.Screens)
-            errors.AddRange(ValidateScreen(name, screen));
+            errors.AddRange(screen is null ? [$"Screen \"{name}\" is null."] : ValidateScreen(name, screen));
 
         foreach (var (frameId, plan) in config.Frames)
-            errors.AddRange(ValidateFrame(frameId, plan, config.Screens));
+            errors.AddRange(plan is null ? [$"Frame \"{frameId}\" is null."] : ValidateFrame(frameId, plan, config.Screens));
 
         return errors;
     }
@@ -94,8 +96,8 @@ internal static class ScreenConfigParser
                 yield return $"Screen \"{name}\": \"limit\" must be between 1 and {MaxDepartureLimit}.";
         }
 
-        if (screen.Type == ScreenTypes.Url && !IsHttpUrl(screen.Url))
-            yield return $"Screen \"{name}\": \"url\" must be an absolute http or https address.";
+        if (screen.Type == ScreenTypes.Url && !IsHttpsUrl(screen.Url))
+            yield return $"Screen \"{name}\": \"url\" must be an absolute https address. The frame page is https, so an http iframe stays blank.";
     }
 
     private static IEnumerable<string> ValidateFrame(string frameId, FramePlan plan, Dictionary<string, ScreenDefinition> screens)
@@ -110,7 +112,14 @@ internal static class ScreenConfigParser
 
         for (var i = 0; i < plan.Schedule.Count; i++)
         {
-            foreach (var error in ValidateRule($"{label}, schedule rule {i + 1}", plan.Schedule[i], screens))
+            var ruleLabel = $"{label}, schedule rule {i + 1}";
+            if (plan.Schedule[i] is null)
+            {
+                yield return $"{ruleLabel} is null.";
+                continue;
+            }
+
+            foreach (var error in ValidateRule(ruleLabel, plan.Schedule[i], screens))
                 yield return error;
         }
     }
@@ -129,11 +138,11 @@ internal static class ScreenConfigParser
 
         foreach (var day in rule.Days ?? [])
         {
-            if (!Days.ContainsKey(day))
+            if (day is null || !Days.ContainsKey(day))
                 yield return $"{label}: unknown day \"{day}\". Use mon, tue, wed, thu, fri, sat, sun.";
         }
     }
 
-    private static bool IsHttpUrl(string? value) =>
-        Uri.TryCreate(value, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp);
+    private static bool IsHttpsUrl(string? value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
 }

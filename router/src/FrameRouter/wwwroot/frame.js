@@ -9,6 +9,8 @@
   const POLL_INTERVAL_MS = 300000;
   const DEPARTURES_REFRESH_MS = 20000;
   const DEPARTURES_STALE_MS = 90000;
+  const FETCH_TIMEOUT_MS = 15000;
+  const RELOAD_RETRY_MS = 300000;
   const NIGHTLY_RELOAD_HOUR = 4; // a daily reload keeps WebView memory in check on 1 GB frames
 
   const root = document.getElementById('screen');
@@ -42,6 +44,19 @@
     disposeScreen();
     root.textContent = '';
     disposeScreen = render(root) || function () {};
+  }
+
+  // A hung request must not stall the next refresh.
+  async function fetchJson(url) {
+    const controller = new AbortController();
+    const timer = setTimeout(function () { controller.abort(); }, FETCH_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      return await response.json();
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   function showMessage(text) {
@@ -130,13 +145,16 @@
         row.appendChild(el('div', 'dep-dir', departure.direction));
         const time = el('div', 'dep-time');
         if (departure.live) time.appendChild(el('span', 'dep-live'));
-        time.appendChild(document.createTextNode(departure.date ? departure.time + ' (jutro)' : departure.time));
+        // date is yyyy-MM-dd and only set when the departure is not today.
+        const day = departure.date ? ' (' + departure.date.slice(8, 10) + '.' + departure.date.slice(5, 7) + ')' : '';
+        time.appendChild(document.createTextNode(departure.time + day));
         row.appendChild(time);
         list.appendChild(row);
       });
 
       if (!screen.title) title.textContent = board.stops.map(function (stop) { return stop.stopName; }).join(' · ');
       const notices = board.stops.map(function (stop) { return stop.notice; }).filter(Boolean);
+      if (board.failedStops.length) notices.push('Brak danych dla przystanku ' + board.failedStops.join(', '));
       notice.hidden = notices.length === 0;
       notice.textContent = notices.join(' · ');
     }
@@ -152,9 +170,7 @@
 
     async function load() {
       try {
-        const response = await fetch(url, { cache: 'no-store' });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        const board = await response.json();
+        const board = await fetchJson(url);
         if (disposed) return;
         lastSuccessAt = Date.now();
         drawRows(board);
@@ -203,8 +219,7 @@
 
   async function poll() {
     try {
-      const response = await fetch('/api/frames/' + encodeURIComponent(frameId) + '/screen', { cache: 'no-store' });
-      if (response.ok) applySnapshot(await response.json());
+      applySnapshot(await fetchJson('/api/frames/' + encodeURIComponent(frameId) + '/screen'));
     } catch (error) {
       setStatus('Brak połączenia z serwerem');
     }
@@ -218,12 +233,30 @@
     }
   }
 
+  // Reload only when the router answers: a reload into a dead link leaves WebView on its
+  // error page, where no script runs to recover.
+  async function reloadWhenReachable() {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(function () { controller.abort(); }, FETCH_TIMEOUT_MS);
+      const response = await fetch('/healthz', { cache: 'no-store', signal: controller.signal });
+      clearTimeout(timer);
+      if (response.ok) {
+        location.reload();
+        return;
+      }
+    } catch (error) {
+      // Router or Wi-Fi is down: try again later.
+    }
+    setTimeout(reloadWhenReachable, RELOAD_RETRY_MS);
+  }
+
   function scheduleNightlyReload() {
     const now = new Date();
     const next = new Date(now);
     next.setHours(NIGHTLY_RELOAD_HOUR, 0, 0, 0);
     if (next <= now) next.setDate(next.getDate() + 1);
-    setTimeout(function () { location.reload(); }, next - now);
+    setTimeout(reloadWhenReachable, next - now);
   }
 
   if (!/^[a-z0-9-]{1,40}$/.test(frameId)) {

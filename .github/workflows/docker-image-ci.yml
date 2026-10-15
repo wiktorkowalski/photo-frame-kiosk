@@ -33,3 +33,9 @@ jobs:
       deploy-compose-path: /home/ubuntu/docker/frame-router
       deploy-runner-labels: '["self-hosted", "homelab"]'
     secrets: inherit
+
+  # The new router starts from the config it saved last; send the current file so both match.
+  push-screens:
+    needs: build-deploy
+    uses: ./.github/workflows/push-screens.yml
+    secrets: inherit

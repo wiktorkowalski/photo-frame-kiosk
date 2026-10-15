@@ -17,7 +17,7 @@ Typy ekranów:
 |---|---|---|
 | `clock` | — | Godzina i data |
 | `departures` | `stops` (id przystanków MZK), `title`, `limit` (1–20, domyślnie 8) | Najbliższe odjazdy MZK Zielona Góra, na żywo z GPS |
-| `url` | `url` | Dowolna strona w ramce `<iframe>` |
+| `url` | `url` (tylko https) | Dowolna strona w ramce `<iframe>`. Strona z `X-Frame-Options` lub CSP `frame-ancestors` zostaje pusta. |
 
 Id przystanku znajdziesz na <https://frame.home.vicio.ovh/stops.html>. Każdy słupek ma własne id i własne kierunki.
 

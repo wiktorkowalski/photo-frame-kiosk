@@ -44,7 +44,7 @@ adb -s "$ADB_SERIAL" shell dumpsys package com.android.webview | grep versionNam
 adb -s "$ADB_SERIAL" shell ls -l /system/xbin/su
 ```
 
-- Strona ramki wymaga WebView 80 lub nowszego. Starsze ramki (na przykład WebView 61) wymagają innej drogi.
+- Strona ramki wymaga WebView 84 lub nowszego. Starsze ramki (na przykład WebView 61) wymagają innej drogi.
 - Gęstość ma wynosić 160. Inna gęstość obcina dół strony: `adb shell wm density 160`.
 - Bez `/system/xbin/su` kroki z `su 0` nie zadziałają.
 

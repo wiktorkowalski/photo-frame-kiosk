@@ -22,5 +22,6 @@ fi
 
 url="$router_url/?frame=$frame_id"
 # Single quotes inside: the device shell must not glob the "?" in the URL.
-adb "${adb_args[@]}" shell am start -n com.wesbos.homehq/.MainActivity --es url "'$url'"
+# The "+" form keeps an empty array safe under set -u in macOS bash 3.2.
+adb ${adb_args[@]+"${adb_args[@]}"} shell am start -n com.wesbos.homehq/.MainActivity --es url "'$url'"
 echo "Kiosk URL set to $url"

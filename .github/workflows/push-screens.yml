@@ -8,6 +8,8 @@ on:
     paths:
       - "screens.json"
   workflow_dispatch:
+  # Docker Image CI calls this after each deploy, so a new image never keeps an older pushed config.
+  workflow_call:
 
 permissions:
   contents: read
@@ -27,7 +29,7 @@ jobs:
         env:
           TOKEN: ${{ secrets.FRAME_ROUTER_CONFIG_TOKEN }}
         run: |
-          code=$(curl --silent --show-error --output response.json --write-out '%{http_code}' \
+          code=$(curl --silent --show-error --max-time 30 --output response.json --write-out '%{http_code}' \
             --header "Authorization: Bearer $TOKEN" \
             --data-binary @screens.json \
             http://frame-router:8080/api/config)

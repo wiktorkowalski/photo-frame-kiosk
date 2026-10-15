@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Xml;
 
 namespace FrameRouter.Mzk;
@@ -14,9 +15,20 @@ internal sealed class DeparturesService(MzkClient mzkClient, TimeProvider timePr
         return BuildBoard(stopIds, boards, limit, timeProvider.GetUtcNow());
     }
 
-    public async Task<IReadOnlyList<StopOption>> FindStopsAsync(string query, CancellationToken cancellationToken)
+    // Null when MZK's stop search fails.
+    public async Task<IReadOnlyList<StopOption>?> FindStopsAsync(string query, CancellationToken cancellationToken)
     {
-        var matches = (await mzkClient.SearchStopsAsync(query, cancellationToken)).Take(MaxStopOptions).ToList();
+        List<StopMatch> matches;
+        try
+        {
+            matches = (await mzkClient.SearchStopsAsync(query, cancellationToken)).Take(MaxStopOptions).ToList();
+        }
+        catch (Exception ex) when (IsMzkFailure(ex, cancellationToken))
+        {
+            logger.LogWarning(ex, "MZK stop search for {StopQuery} failed", query);
+            return null;
+        }
+
         var options = new StopOption[matches.Count];
 
         // Lines and directions are not in the stop list; only a timetable call shows which way a post goes.
@@ -55,11 +67,15 @@ internal sealed class DeparturesService(MzkClient mzkClient, TimeProvider timePr
         {
             return await mzkClient.GetTimetableAsync(stopId, cancellationToken);
         }
-        catch (Exception ex) when (ex is HttpRequestException or XmlException or FormatException
-                                   || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+        catch (Exception ex) when (IsMzkFailure(ex, cancellationToken))
         {
             logger.LogWarning(ex, "MZK timetable for stop {StopId} failed", stopId);
             return null;
         }
     }
+
+    // Timeouts count, a cancelled request does not. Parse errors cover a changed response format.
+    private static bool IsMzkFailure(Exception ex, CancellationToken cancellationToken) =>
+        ex is HttpRequestException or XmlException or JsonException or FormatException or InvalidOperationException
+        || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested);
 }

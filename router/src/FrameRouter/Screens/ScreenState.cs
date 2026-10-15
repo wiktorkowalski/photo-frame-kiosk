@@ -32,8 +32,10 @@ internal sealed class ScreenState(ConfigStore configStore, TimeProvider timeProv
             RefreshLocked();
     }
 
-    public async IAsyncEnumerable<SseItem<ScreenSnapshot>> StreamAsync(string frameId, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<SseItem<ScreenSnapshot>> StreamAsync(string frameId, [EnumeratorCancellation] CancellationToken requestAborted, CancellationToken appStopping)
     {
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(requestAborted, appStopping);
+        var cancellationToken = linked.Token;
         while (!cancellationToken.IsCancellationRequested)
         {
             ScreenSnapshot snapshot;
