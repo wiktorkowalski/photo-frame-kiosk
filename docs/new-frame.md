@@ -4,7 +4,8 @@ Ta instrukcja opisuje drogę sprawdzoną 15.10.2026 na ramce Dxmart ZN-DP1002 (S
 Inne modele mogą się różnić. Opisy innych ramek są w repo
 [wesbos/photo-frame-dashboard](https://github.com/wesbos/photo-frame-dashboard) (`docs/devices.md`).
 
-Cel: ramka po starcie pokazuje stronę `https://frame.home.vicio.ovh/?frame=<id>`.
+Cel: ramka po starcie pokazuje stronę `https://wiktorkowalski.github.io/photo-frame-kiosk/?frame=<id>`.
+Ramka potrzebuje tylko Wi-Fi z internetem. Sieć domowa nie jest wymagana (poza ekranem Home Assistant).
 O treści decyduje `screens.json` w tym repo. Frameo i aktualizatory producenta są wyłączone.
 
 ## Zasady
@@ -93,17 +94,16 @@ Back i Dashboard poza kioskiem. W kiosku przytrzymaj dwa nieruchome palce przez 
 "kuchnia": { "default": "clock" }
 ```
 
-3. Zrób commit i push na `master`. Workflow **Push screens** wyśle plik do routera.
+3. Zrób commit i push na `master`. Workflow **Pages** sprawdzi plik i opublikuje stronę.
    Czerwony przebieg oznacza błąd w pliku. Treść błędu jest w logu przebiegu.
 
-## 8. Skieruj kiosk na router
+## 8. Skieruj kiosk na stronę ramki
 
 ```sh
 scripts/set-kiosk-url.sh kuchnia
 ```
 
-Ramka musi rozwiązać `frame.home.vicio.ovh` na `192.168.1.12` i dosięgnąć tego adresu na porcie 443.
-W osobnym VLAN-ie sprawdź regułę zapory.
+Ramka musi mieć dostęp do `wiktorkowalski.github.io` i do Workera MZK (`*.workers.dev`) na porcie 443.
 
 ## 9. Wyłącz Frameo
 
@@ -136,11 +136,11 @@ adb -s "$ADB_SERIAL" shell settings get secure enabled_accessibility_services
 - Na wierzchu jest `com.wesbos.homehq`.
 - Frameo i aktualizatory są na liście wyłączonych pakietów.
 - Usługa `com.wesbos.homehq/.NavigationService` jest włączona.
-- Ekran pokazuje ekran z `screens.json`. Zmiana `default` w repo przełącza ramkę w około 30 s.
+- Ekran pokazuje ekran z `screens.json`. Zmiana `default` w repo przełącza ramkę w około 2 minuty.
 
 ## Znane problemy
 
 - Przy uśpionym ekranie Wi-Fi nie łączy się ponownie (sterownik nie obsługuje skanowania w tle).
-  Kiosk trzyma ekran włączony. Do przyciemniania użyj strony, nie usypiania.
+  Kiosk trzyma ekran włączony. Do przyciemniania użyj `dim` w `screens.json`, nie usypiania.
 - Na PF1007L aktualizacja kiosku (`adb install -r`) wyłączała usługę nawigacji. Na Dxmart tego jeszcze nie sprawdzono.
   Po aktualizacji kiosku sprawdź krok 10.

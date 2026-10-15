@@ -1,0 +1,44 @@
+name: Worker
+
+# Deploys the MZK proxy (worker/) to Cloudflare Workers.
+# Needs the repo secrets CLOUDFLARE_API_TOKEN (Workers Scripts: Edit) and CLOUDFLARE_ACCOUNT_ID.
+on:
+  push:
+    branches: ["master"]
+    paths:
+      - "worker/**"
+      - ".github/workflows/worker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      MZK_API_URL: ${{ vars.MZK_API_URL }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Test
+        run: npm test
+
+      - name: Deploy
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        working-directory: worker
+        run: npx --yes wrangler@4.142.0 deploy
+
+      - name: Skip without Cloudflare token
+        if: env.CLOUDFLARE_API_TOKEN == ''
+        run: echo "::warning::CLOUDFLARE_API_TOKEN is not set, so the Worker was not deployed."
+
+      - name: Smoke test
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.MZK_API_URL != ''
+        run: curl --fail --silent --show-error --max-time 30 "$MZK_API_URL/departures?stops=11&limit=1"

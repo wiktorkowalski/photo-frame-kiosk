@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Points a frame's Home HQ kiosk at its router page and prints the saved URL.
+# Points a frame's Home HQ kiosk at its frame page.
 # Usage: ADB_SERIAL=<serial> scripts/set-kiosk-url.sh <frame-id>
 # The frame id must have an entry under "frames" in screens.json.
 set -euo pipefail
 
-router_url="${ROUTER_URL:-https://frame.home.vicio.ovh}"
+site_url="${FRAME_SITE_URL:-https://wiktorkowalski.github.io/photo-frame-kiosk}"
 frame_id="${1:-}"
 
 if [[ ! "$frame_id" =~ ^[a-z0-9-]{1,40}$ ]]; then
@@ -20,7 +20,7 @@ elif [[ "$(adb devices | grep -c -w device)" -ne 1 ]]; then
   exit 2
 fi
 
-url="$router_url/?frame=$frame_id"
+url="$site_url/?frame=$frame_id"
 # Single quotes inside: the device shell must not glob the "?" in the URL.
 # The "+" form keeps an empty array safe under set -u in macOS bash 3.2.
 adb ${adb_args[@]+"${adb_args[@]}"} shell am start -n com.wesbos.homehq/.MainActivity --es url "'$url'"

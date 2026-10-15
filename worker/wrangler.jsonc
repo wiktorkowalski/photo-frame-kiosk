@@ -1,0 +1,9 @@
+{
+  "$schema": "https://unpkg.com/wrangler@4.142.0/config-schema.json",
+  "name": "frame-mzk",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  // Served on <name>.<account>.workers.dev: no DNS record, so nothing to change in cloudflare-terraform.
+  "workers_dev": true,
+  "observability": { "enabled": true }
+}

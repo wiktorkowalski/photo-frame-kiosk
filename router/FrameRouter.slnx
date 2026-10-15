@@ -1,8 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/FrameRouter/FrameRouter.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/FrameRouter.Tests/FrameRouter.Tests.csproj" />
-  </Folder>
-</Solution>
