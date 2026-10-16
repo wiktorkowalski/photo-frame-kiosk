@@ -6,9 +6,9 @@
     "clock": { "type": "clock" },
     "departures": {
       "type": "departures",
-      "title": "Dworzec Główny",
+      "title": "Racula Dzieci Wrzesińskich",
       // MZK busStopId values. Find a stop at https://frame.vicio.ovh/stops.html
-      "stops": [11],
+      "stops": [309],
       "limit": 8
     },
     // Home Assistant kiosk dashboard. Log in once by touch on the frame (README, "Home Assistant").
